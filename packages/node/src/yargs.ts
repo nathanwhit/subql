@@ -140,6 +140,12 @@ export function getYargsOption() {
       describe: 'The port the service will bind to',
       type: 'number',
     },
+    workers: {
+      alias: 'w',
+      demandOption: false,
+      describe: 'Number of worker threads to use for fetching blocks',
+      type: 'number',
+    },
   });
 }
 
