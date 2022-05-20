@@ -10,7 +10,7 @@ import { DictionaryService } from './dictionary.service';
 function testSubqueryProject(): SubqueryProject {
   return {
     network: {
-      dictionary: `https://api.subquery.network/sq/subquery/dictionary-polkadot`,
+      dictionary: `https://api.subquery.network/sq/subquery/polkadot-dictionary`,
     },
     dataSources: [],
     id: 'test',
@@ -176,5 +176,13 @@ describe('DictionaryService', () => {
       ],
     );
     expect(dic.batchBlocks[dic.batchBlocks.length - 1]).toBe(333524);
+  }, 500000);
+
+  it('should return all specVersion', async () => {
+    const project = testSubqueryProject();
+    const dictionaryService = new DictionaryService(project);
+
+    const dic = await dictionaryService.getSpecVersion();
+    console.log(dic);
   }, 500000);
 });

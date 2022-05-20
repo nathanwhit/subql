@@ -205,6 +205,7 @@ export async function prefetchMetadata(
  * @param endHeight
  * @param overallSpecVer exists if all blocks in the range have same parant specVersion
  */
+//Deprecated
 export async function fetchBlocks(
   api: ApiPromise,
   startHeight: number,
@@ -236,6 +237,45 @@ export async function fetchBlocks(
     };
   });
 }
+
+// export async function fetchBlocks2(
+//   api: ApiPromise,
+//   startHeight: number,
+//   endHeight: number,
+//   specVersionMap?: SpecVersion[],
+// ): Promise<BlockContent[]> {
+//   const blocks = await fetchBlocksRange(api, startHeight, endHeight);
+//   const blockHashs = blocks.map((b) => b.block.header.hash);
+//   const parentBlockHashs = blocks.map((b) => b.block.header.parentHash);
+//
+//   const blockEvents = await fetchEventsRange(api, blockHashs);
+//
+//   if(specVersionMap && specVersionMap.length!==0){
+//     //use dictionary specVersionMap here, check if map cover start to end height
+//
+//   }else{
+//     const runtimeVersions = await fetchRuntimeVersionRange(api, parentBlockHashs);
+//
+//   }
+//
+//
+//
+//   return blocks.map((block, idx) => {
+//     const events = blockEvents[idx];
+//     const parentSpecVersion = overallSpecVer
+//       ? overallSpecVer
+//       : runtimeVersions[idx].specVersion.toNumber();
+//
+//     const wrappedBlock = wrapBlock(block, events.toArray(), parentSpecVersion);
+//     const wrappedExtrinsics = wrapExtrinsics(wrappedBlock, events);
+//     const wrappedEvents = wrapEvents(wrappedExtrinsics, events, wrappedBlock);
+//     return {
+//       block: wrappedBlock,
+//       extrinsics: wrappedExtrinsics,
+//       events: wrappedEvents,
+//     };
+//   });
+// }
 
 export async function fetchBlocksViaRangeQuery(
   api: ApiPromise,

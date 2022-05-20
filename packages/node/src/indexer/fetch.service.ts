@@ -32,7 +32,11 @@ import * as SubstrateUtil from '../utils/substrate';
 import { getYargsOption } from '../yargs';
 import { ApiService } from './api.service';
 import { BlockedQueue } from './BlockedQueue';
-import { Dictionary, DictionaryService } from './dictionary.service';
+import {
+  Dictionary,
+  DictionaryService,
+  SpecVersion,
+} from './dictionary.service';
 import { DsProcessorService } from './ds-processor.service';
 import { IndexerEvent } from './events';
 import { BlockContent } from './types';
@@ -123,6 +127,7 @@ export class FetchService implements OnApplicationShutdown {
   private useDictionary: boolean;
   private dictionaryQueryEntries?: DictionaryQueryEntry[];
   private batchSizeScale: number;
+  private specVersionMap: SpecVersion[]; //TODO add types
 
   constructor(
     private apiService: ApiService,
@@ -367,8 +372,6 @@ export class FetchService implements OnApplicationShutdown {
             scaledBatchSize,
             this.dictionaryQueryEntries,
           );
-          //TODO
-          // const specVersionMap = dictionary.specVersions;
           if (
             dictionary &&
             this.dictionaryValidation(dictionary, startBlockHeight)
@@ -439,8 +442,8 @@ export class FetchService implements OnApplicationShutdown {
     }
   }
 
-  @profiler(argv.profiler)
-  async fetchMeta(height: number): Promise<boolean> {
+  async getSpecFromApi(height: number): Promise<number> {
+    console.log(`getSpecFromApi`);
     const parentBlockHash = await this.api.rpc.chain.getBlockHash(
       Math.max(height - 1, 0),
     );
@@ -448,9 +451,52 @@ export class FetchService implements OnApplicationShutdown {
       parentBlockHash,
     );
     const specVersion = runtimeVersion.specVersion.toNumber();
+    return specVersion;
+  }
+
+  getSpecFromMap(
+    blockHeight: number,
+    specVersions: SpecVersion[],
+  ): number | undefined {
+    console.log(`getSpecFromMap`);
+    if (blockHeight > specVersions[specVersions.length - 1].blockHeight) {
+      //If block height is greater than last specVersion start block, we can not guarantee its change,
+      // therefore return undefined fall back with api method
+      return;
+    } else {
+      // Don't need to handle the last specVersion
+      for (let i = 0; i < specVersions.length - 1; i++) {
+        if (
+          blockHeight >= specVersions[i].blockHeight &&
+          blockHeight < specVersions[i + 1].blockHeight
+        ) {
+          return Number(specVersions[i].id);
+        }
+      }
+    }
+  }
+
+  async getSpecVersion(blockHeight: number): Promise<number> {
+    if (this.useDictionary) {
+      if (!this.specVersionMap || this.specVersionMap.length === 0) {
+        // try to get specVersion
+        this.specVersionMap = await this.dictionaryService.getSpecVersion();
+      }
+      const specFromMap = this.getSpecFromMap(blockHeight, this.specVersionMap);
+      if (specFromMap === undefined) {
+        return this.getSpecFromApi(blockHeight);
+      } else {
+        return specFromMap;
+      }
+    } else {
+      return this.getSpecFromApi(blockHeight);
+    }
+  }
+
+  @profiler(argv.profiler)
+  async fetchMeta(height: number): Promise<boolean> {
+    const specVersion = await this.getSpecVersion(height);
     if (this.parentSpecVersion !== specVersion) {
-      const blockHash = await this.api.rpc.chain.getBlockHash(height);
-      await SubstrateUtil.prefetchMetadata(this.api, blockHash);
       this.parentSpecVersion = specVersion;
       return true;
     }

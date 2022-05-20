@@ -256,7 +256,7 @@ describe('FetchService', () => {
     const project = testSubqueryProject();
     //set dictionary to a different network
     project.network.dictionary =
-      'https://api.subquery.network/sq/subquery/dictionary-polkadot';
+      'https://api.subquery.network/sq/subquery/polkadot-dictionary';
     project.dataSources = [
       {
         name: 'runtime',
@@ -354,5 +354,60 @@ describe('FetchService', () => {
     await loopPromise;
     expect(dictionaryValidationSpy).toBeCalledTimes(1);
     expect(nextEndBlockHeightSpy).toBeCalled();
+  }, 500000);
+
+  it('use dictionary and specVersionMap to get block specVersion', async () => {
+    const batchSize = 5;
+    const project = testSubqueryProject();
+    //set dictionary to a different network
+    project.network.dictionary =
+      'https://api.subquery.network/sq/subquery/polkadot-dictionary';
+
+    fetchService = await createFetchService(project, batchSize);
+    await fetchService.init();
+    (fetchService as any).useDictionary = true;
+    const getSpecFromMapSpy = jest.spyOn(fetchService, 'getSpecFromMap');
+    const specVersion = await fetchService.getSpecVersion(8638105);
+    expect(getSpecFromMapSpy).toBeCalledTimes(1);
+  }, 500000);
+
+  it('use api to get block specVersion when blockHeight greater than of specVersionMap last record', async () => {
+    const batchSize = 5;
+    const project = testSubqueryProject();
+    //set dictionary to a different network
+    project.network.dictionary =
+      'https://api.subquery.network/sq/subquery/polkadot-dictionary';
+
+    fetchService = await createFetchService(project, batchSize);
+    await fetchService.init();
+    (fetchService as any).useDictionary = true;
+    const getSpecFromMapSpy = jest.spyOn(fetchService, 'getSpecFromMap');
+    const getSpecFromApiSpy = jest.spyOn(fetchService, 'getSpecFromApi');
+
+    // current last specVersion 9190, we should always use api for check next spec
+    const specVersion = await fetchService.getSpecVersion(10156860);
+    // It checked with dictionary specVersionMap once, and fall back to use api method
+    expect(getSpecFromMapSpy).toBeCalledTimes(1);
+    expect(getSpecFromApiSpy).toBeCalledTimes(1);
+  }, 500000);
+
+  it('only fetch SpecVersion from dictionary once', async () => {
+    const batchSize = 5;
+    const project = testSubqueryProject();
+    //set dictionary to a different network
+    project.network.dictionary =
+      'https://api.subquery.network/sq/subquery/polkadot-dictionary';
+
+    fetchService = await createFetchService(project, batchSize);
+    await fetchService.init();
+    (fetchService as any).useDictionary = true;
+    const dictionaryService = (fetchService as any).dictionaryService;
+
+    const getSpecVersionSpy = jest.spyOn(dictionaryService, 'getSpecVersion');
+
+    await fetchService.getSpecVersion(8638105);
+    await fetchService.getSpecVersion(8638200);
+
+    expect(getSpecVersionSpy).toBeCalledTimes(1);
   }, 500000);
 });

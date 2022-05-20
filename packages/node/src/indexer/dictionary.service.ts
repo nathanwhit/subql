@@ -17,6 +17,11 @@ import { getLogger } from '../utils/logger';
 import { profiler } from '../utils/profiler';
 import { getYargsOption } from '../yargs';
 
+export type SpecVersion = {
+  id: string;
+  blockHeight: number; //start with this block
+};
+
 export type Dictionary = {
   _metadata: MetaData;
   batchBlocks: number[];
@@ -231,5 +236,43 @@ export class DictionaryService implements OnApplicationShutdown {
       vars.push(...pVars);
     }
     return buildQuery(vars, nodes);
+  }
+
+  async getSpecVersion(): Promise<SpecVersion[]> {
+    const { query } = this.specVersionQuery();
+    try {
+      const resp = await this.client.query({
+        query: gql(query),
+      });
+      const specVersionBlockHeightSet = new Set<SpecVersion>();
+
+      if (resp.data.specVersions && resp.data.specVersions.nodes.length >= 0) {
+        for (const node of resp.data.specVersions.nodes) {
+          specVersionBlockHeightSet.add({
+            id: node.id,
+            blockHeight: Number(node.blockHeight),
+          });
+        }
+      }
+      return Array.from(specVersionBlockHeightSet);
+    } catch (err) {
+      logger.warn(err, `failed to fetch specVersion result`);
+      return undefined;
+    }
+  }
+
+  private specVersionQuery(): GqlQuery {
+    const nodes: GqlNode[] = [
+      {
+        entity: 'specVersions',
+        project: [
+          {
+            entity: 'nodes',
+            project: ['id', 'blockHeight'],
+          },
+        ],
+      },
+    ];
+    return buildQuery([], nodes);
   }
 }
