@@ -113,7 +113,6 @@ function checkMemoryUsage(batchSize: number, batchSizeScale: number): number {
 @Injectable()
 export class FetchService implements OnApplicationShutdown {
   private latestBestHeight: number;
-  private latestFinalizedHeight: number;
   private latestProcessedHeight: number;
   private latestBufferedHeight: number;
   private blockBuffer: BlockedQueue<BlockContent>;
@@ -264,12 +263,11 @@ export class FetchService implements OnApplicationShutdown {
     this.eventEmitter.emit(IndexerEvent.UsingDictionary, {
       value: Number(this.useDictionary),
     });
-    await this.getFinalizedBlockHead();
     await this.getBestBlockHead();
   }
 
   @Interval(CHECK_MEMORY_INTERVAL)
-  checkBatchScale() {
+  checkBatchScale(): void {
     if (argv['scale-batch-size']) {
       const scale = checkMemoryUsage(
         this.nodeConfig.batchSize,
@@ -283,29 +281,7 @@ export class FetchService implements OnApplicationShutdown {
   }
 
   @Interval(BLOCK_TIME_VARIANCE * 1000)
-  async getFinalizedBlockHead() {
-    if (!this.api) {
-      logger.debug(`Skip fetch finalized block until API is ready`);
-      return;
-    }
-    try {
-      const finalizedHead = await this.api.rpc.chain.getFinalizedHead();
-      const finalizedBlock = await this.api.rpc.chain.getBlock(finalizedHead);
-      const currentFinalizedHeight =
-        finalizedBlock.block.header.number.toNumber();
-      if (this.latestFinalizedHeight !== currentFinalizedHeight) {
-        this.latestFinalizedHeight = currentFinalizedHeight;
-        this.eventEmitter.emit(IndexerEvent.BlockTarget, {
-          height: this.latestFinalizedHeight,
-        });
-      }
-    } catch (e) {
-      logger.error(e, `Having a problem when get finalized block`);
-    }
-  }
-
-  @Interval(BLOCK_TIME_VARIANCE * 1000)
-  async getBestBlockHead() {
+  async getBestBlockHead(): Promise<void> {
     if (!this.api) {
       logger.debug(`Skip fetch best block until API is ready`);
       return;
@@ -316,6 +292,9 @@ export class FetchService implements OnApplicationShutdown {
       if (this.latestBestHeight !== currentBestHeight) {
         this.latestBestHeight = currentBestHeight;
         this.eventEmitter.emit(IndexerEvent.BlockBest, {
+          height: this.latestBestHeight,
+        });
+        this.eventEmitter.emit(IndexerEvent.BlockTarget, {
           height: this.latestBestHeight,
         });
       }
@@ -356,7 +335,7 @@ export class FetchService implements OnApplicationShutdown {
 
       if (
         this.blockNumberBuffer.freeSize < scaledBatchSize ||
-        startBlockHeight > this.latestFinalizedHeight
+        startBlockHeight > this.latestBestHeight
       ) {
         await delay(1);
         continue;
@@ -466,8 +445,8 @@ export class FetchService implements OnApplicationShutdown {
   ): number {
     let endBlockHeight = startBlockHeight + scaledBatchSize - 1;
 
-    if (endBlockHeight > this.latestFinalizedHeight) {
-      endBlockHeight = this.latestFinalizedHeight;
+    if (endBlockHeight > this.latestBestHeight) {
+      endBlockHeight = this.latestBestHeight;
     }
     return endBlockHeight;
   }

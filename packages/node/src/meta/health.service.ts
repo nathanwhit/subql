@@ -21,7 +21,7 @@ export class HealthService {
   private recordBlockTimestamp?: number;
   private currentProcessingHeight?: number;
   private currentProcessingTimestamp?: number;
-  private blockTime = 6000;
+  private blockTime = 60000;
   private healthTimeout: number;
   private indexerHealthy: boolean;
 
